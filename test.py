@@ -35,7 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--datapath', type=str, default='./dataset',
                         help='Root dataset path (contains VOCdevkit/)')
     parser.add_argument('--benchmark', type=str, default='pascal',
-                        choices=['pascal', 'fss', 'deepglobe', 'isic', 'lung'])
+                        choices=['pascal', 'fss', 'deepglobe', 'isic', 'lung', 'chick'])
     parser.add_argument('--logpath', type=str, default='./')
     parser.add_argument('--bsz', type=int, default=1)
     parser.add_argument('--nworker', type=int, default=0)
