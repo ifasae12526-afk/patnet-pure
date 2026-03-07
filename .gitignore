@@ -1,0 +1,15 @@
+# Dataset files
+dataset/
+
+# Training logs
+logs/
+logs_test/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Compiled extensions
+*.pyd
+*.so
