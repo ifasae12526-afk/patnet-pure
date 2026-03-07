@@ -1,4 +1,4 @@
-r""" Cross-Domain Few-Shot Semantic Segmentation testing code — adapted for CD-FSS comparison """
+r""" Few-Shot Semantic Segmentation testing code — PASCAL VOC 1-way 5-shot """
 import argparse
 
 import torch.nn as nn
@@ -31,21 +31,21 @@ def test(model, dataloader, nshot):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PATNet CD-FSS Testing (apple-to-apple with SAM2CDFSS)')
+    parser = argparse.ArgumentParser(description='PATNet Testing — 1-way 5-shot PASCAL VOC')
     parser.add_argument('--datapath', type=str, default='./dataset',
-                        help='Root dataset path (contains VOCdevkit/, FSS-1000/, chick/, etc.)')
-    parser.add_argument('--benchmark', type=str, default='chick',
-                        choices=['fss', 'deepglobe', 'isic', 'lung', 'chick'])
+                        help='Root dataset path (contains VOCdevkit/)')
+    parser.add_argument('--benchmark', type=str, default='pascal',
+                        choices=['pascal', 'fss', 'deepglobe', 'isic', 'lung'])
     parser.add_argument('--logpath', type=str, default='./')
-    parser.add_argument('--bsz', type=int, default=2)
+    parser.add_argument('--bsz', type=int, default=1)
     parser.add_argument('--nworker', type=int, default=0)
     parser.add_argument('--load', type=str, default='',
                         help='Path to trained model checkpoint (best_model.pt)')
     parser.add_argument('--fold', type=int, default=0)
-    parser.add_argument('--nshot', type=int, default=1)
+    parser.add_argument('--nshot', type=int, default=5)
     parser.add_argument('--backbone', type=str, default='resnet50', choices=['vgg16', 'resnet50'])
     parser.add_argument('--img_size', type=int, default=512,
-                        help='Input image size (512 to match SAM2CDFSS)')
+                        help='Input image size')
     args = parser.parse_args()
     Logger.initialize(args, training=False)
 
@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
     if args.load == '':
         raise Exception('Pretrained model not specified.')
-    model.load_state_dict(torch.load(args.load))
+    model.load_state_dict(torch.load(args.load, map_location=device, weights_only=True))
 
     Evaluator.initialize()
 

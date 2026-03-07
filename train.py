@@ -1,11 +1,10 @@
-r""" PATNet training (validation) code — adapted for CD-FSS comparison with SAM2CDFSS.
+r""" PATNet training (validation) code — pure PASCAL VOC setup.
 
-Training setup mirrors SAM2CDFSS:
-  - Primary train: pascal (VOC2012, fold=4, all 20 classes)
-  - Auxiliary train: chick (mixed-domain, optional)
-  - Validation: fss (FSS-1000)
+Training setup:
+  - Train: pascal (VOC2012, fold=4, all 20 classes)
+  - Validation: pascal (VOC2012, fold-based validation)
 
-Algorithm stays PATNet's own (ResNet50 backbone, 4D correlation, CrossEntropyLoss).
+Algorithm: PATNet (ResNet50 backbone, 4D correlation, CrossEntropyLoss).
 """
 import sys
 sys.path.insert(0, "../")
@@ -59,35 +58,28 @@ def train(epoch, model, dataloader, optimizer, training, label=''):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PATNet CD-FSS Training (apple-to-apple with SAM2CDFSS)')
+    parser = argparse.ArgumentParser(description='PATNet Training — Pure PASCAL VOC')
 
     # Data paths
     parser.add_argument('--datapath', type=str, default='./dataset',
-                        help='Root dataset path (contains VOCdevkit/, FSS-1000/, chick/, etc.)')
+                        help='Root dataset path (contains VOCdevkit/)')
 
-    # Training benchmarks (mirrors SAM2CDFSS)
+    # Training benchmarks
     parser.add_argument('--benchmark_train', type=str, default='pascal',
-                        choices=['pascal', 'fss', 'deepglobe', 'isic', 'lung', 'chick'])
-    parser.add_argument('--benchmark_train_aux', type=str, default='',
-                        choices=['', 'pascal', 'fss', 'deepglobe', 'isic', 'lung', 'chick'],
-                        help='Auxiliary training benchmark (mixed-domain). Empty = disabled.')
-    parser.add_argument('--benchmark_val', type=str, default='fss',
-                        choices=['pascal', 'fss', 'deepglobe', 'isic', 'lung', 'chick'])
+                        choices=['pascal', 'fss', 'deepglobe', 'isic', 'lung'])
+    parser.add_argument('--benchmark_val', type=str, default='pascal',
+                        choices=['pascal', 'fss', 'deepglobe', 'isic', 'lung'])
 
-    parser.add_argument('--logpath', type=str, default='patnet_cdfss')
+    parser.add_argument('--logpath', type=str, default='patnet_pascal')
     parser.add_argument('--bsz', type=int, default=2)
-    parser.add_argument('--bsz_aux', type=int, default=0,
-                        help='Batch size for auxiliary training. 0 = same as --bsz.')
     parser.add_argument('--bsz_val', type=int, default=2)
     parser.add_argument('--lr', type=float, default=3e-4)
-    parser.add_argument('--niter', type=int, default=30)
+    parser.add_argument('--niter', type=int, default=8)
     parser.add_argument('--nworker', type=int, default=0)
     parser.add_argument('--fold', type=int, default=4, choices=[0, 1, 2, 3, 4])
     parser.add_argument('--val_fold', type=int, default=0, choices=[0, 1, 2, 3, 4])
     parser.add_argument('--backbone', type=str, default='resnet50', choices=['vgg16', 'resnet50'])
     parser.add_argument('--img_size', type=int, default=512)
-    parser.add_argument('--episodes_per_epoch', type=int, default=200,
-                        help='Virtual episodes per epoch for small datasets (chick)')
 
     # For backward compatibility with Logger
     parser.add_argument('--benchmark', type=str, default='pascal')
@@ -108,23 +100,11 @@ if __name__ == '__main__':
     optimizer = optim.Adam([{"params": model.parameters(), "lr": args.lr}])
     Evaluator.initialize()
 
-    # ── Primary train dataset ──
-    FSSDataset.initialize(img_size=args.img_size, datapath=args.datapath,
-                          episodes_per_epoch=args.episodes_per_epoch)
+    # ── Train dataset ──
+    FSSDataset.initialize(img_size=args.img_size, datapath=args.datapath)
     dataloader_trn = FSSDataset.build_dataloader(args.benchmark_train, args.bsz,
                                                   args.nworker, args.fold, 'trn')
-    Logger.info('Primary train: %s (%d batches)' % (args.benchmark_train, len(dataloader_trn)))
-
-    # ── Auxiliary train dataset (mixed-domain, same as SAM2CDFSS) ──
-    dataloader_trn_aux = None
-    if args.benchmark_train_aux:
-        FSSDataset.initialize(img_size=args.img_size, datapath=args.datapath,
-                              episodes_per_epoch=args.episodes_per_epoch)
-        bsz_aux = args.bsz_aux if args.bsz_aux > 0 else args.bsz
-        dataloader_trn_aux = FSSDataset.build_dataloader(
-            args.benchmark_train_aux, bsz_aux, args.nworker, 0, 'trn')
-        Logger.info('Auxiliary train: %s (%d batches)' % (args.benchmark_train_aux, len(dataloader_trn_aux)))
-        Logger.info('Mixed-domain: primary=%s + aux=%s' % (args.benchmark_train, args.benchmark_train_aux))
+    Logger.info('Train: %s (%d batches)' % (args.benchmark_train, len(dataloader_trn)))
 
     # ── Validation dataset ──
     FSSDataset.initialize(img_size=args.img_size, datapath=args.datapath)
@@ -137,19 +117,12 @@ if __name__ == '__main__':
 
     for epoch in range(args.niter):
 
-        # Phase 1: Primary training (e.g. Pascal)
+        # Phase 1: Training
         trn_loss, trn_miou, trn_fb_iou = train(
             epoch, model, dataloader_trn, optimizer, training=True,
             label='Train-%s' % args.benchmark_train)
 
-        # Phase 2: Auxiliary training (e.g. Chick) — same as SAM2CDFSS
-        if dataloader_trn_aux is not None:
-            torch.cuda.empty_cache()
-            aux_loss, aux_miou, aux_fb_iou = train(
-                epoch, model, dataloader_trn_aux, optimizer, training=True,
-                label='Train-%s' % args.benchmark_train_aux)
-
-        # Phase 3: Validation
+        # Phase 2: Validation
         torch.cuda.empty_cache()
         with torch.no_grad():
             val_loss, val_miou, val_fb_iou = train(
@@ -164,9 +137,6 @@ if __name__ == '__main__':
         Logger.tbd_writer.add_scalars('loss', {'trn': trn_loss, 'val': val_loss}, epoch)
         Logger.tbd_writer.add_scalars('miou', {'trn': trn_miou, 'val': val_miou}, epoch)
         Logger.tbd_writer.add_scalars('fb_iou', {'trn': trn_fb_iou, 'val': val_fb_iou}, epoch)
-        if dataloader_trn_aux is not None:
-            Logger.tbd_writer.add_scalars('loss_aux', {'trn_aux': aux_loss}, epoch)
-            Logger.tbd_writer.add_scalars('miou_aux', {'trn_aux': aux_miou}, epoch)
         Logger.tbd_writer.flush()
 
         elapsed = time.time() - start_time

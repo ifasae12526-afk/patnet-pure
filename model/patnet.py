@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import resnet
 from torchvision.models import vgg
+from torchvision.models import ResNet50_Weights, VGG16_Weights
 
 from .base.feature import extract_feat_vgg, extract_feat_res
 from .base.correlation import Correlation
@@ -20,7 +21,7 @@ class PATNetwork(nn.Module):
         # 1. Backbone network initialization
         self.backbone_type = backbone
         if backbone == 'vgg16':
-            self.backbone = vgg.vgg16(pretrained=True)
+            self.backbone = vgg.vgg16(weights=VGG16_Weights.IMAGENET1K_V1)
             self.feat_ids = [17, 19, 21, 24, 26, 28, 30]
             self.extract_feats = extract_feat_vgg
             nbottlenecks = [2, 2, 3, 3, 3, 1]
@@ -34,7 +35,7 @@ class PATNetwork(nn.Module):
             nn.init.kaiming_normal_(self.reference_layer1.weight, a=0, mode='fan_in', nonlinearity='linear')
             nn.init.constant_(self.reference_layer1.bias, 0)
         elif backbone == 'resnet50':
-            self.backbone = resnet.resnet50(pretrained=True)
+            self.backbone = resnet.resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
             self.feat_ids = list(range(4, 17))
             self.extract_feats = extract_feat_res
             nbottlenecks = [3, 4, 6, 3]
