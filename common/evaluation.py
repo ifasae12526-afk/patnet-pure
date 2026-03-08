@@ -1,5 +1,6 @@
 r""" Evaluate mask prediction """
 import torch
+from sklearn.metrics import average_precision_score
 
 
 class Evaluator:
@@ -37,3 +38,29 @@ class Evaluator:
         area_union = area_pred + area_gt - area_inter
 
         return area_inter, area_union
+
+    @classmethod
+    def compute_mae(cls, pred_prob, gt_mask):
+        r""" Compute Mean Absolute Error between predicted probabilities and ground-truth mask """
+        mae_list = []
+        for _prob, _gt in zip(pred_prob, gt_mask):
+            valid = _gt != cls.ignore_index
+            _prob_valid = _prob[valid].float()
+            _gt_valid = _gt[valid].float()
+            mae_list.append((_prob_valid - _gt_valid).abs().mean())
+        return torch.stack(mae_list).mean()
+
+    @classmethod
+    def compute_ap(cls, pred_prob, gt_mask):
+        r""" Compute Average Precision per sample, return mean AP over batch """
+        ap_list = []
+        for _prob, _gt in zip(pred_prob, gt_mask):
+            valid = _gt != cls.ignore_index
+            _prob_np = _prob[valid].cpu().numpy().flatten()
+            _gt_np = _gt[valid].cpu().numpy().flatten().astype(int)
+            if _gt_np.sum() == 0 or _gt_np.sum() == len(_gt_np):
+                continue  # skip if no positive or all positive
+            ap_list.append(average_precision_score(_gt_np, _prob_np))
+        if len(ap_list) == 0:
+            return torch.tensor(0.0)
+        return torch.tensor(sum(ap_list) / len(ap_list))

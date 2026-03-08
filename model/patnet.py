@@ -163,14 +163,20 @@ class PATNetwork(nn.Module):
         return kl_agg/nshot
 
 
-    def predict_mask_nshot(self, batch, nshot):
+    def predict_mask_nshot(self, batch, nshot, return_probs=False):
 
         # Perform multiple prediction given (nshot) number of different support sets
         logit_mask_agg = 0
+        prob_agg = 0
         for s_idx in range(nshot):
             logit_mask = self(batch['query_img'], batch['support_imgs'][:, s_idx], batch['support_masks'][:, s_idx])
+            prob = F.softmax(logit_mask, dim=1)[:, 1]  # foreground probability
+            prob_agg += prob
             logit_mask_agg += logit_mask.argmax(dim=1)
-            if nshot == 1: return logit_mask_agg
+            if nshot == 1:
+                if return_probs:
+                    return logit_mask_agg, prob
+                return logit_mask_agg
 
         # Average & quantize predictions given threshold (=0.5)
         bsz = logit_mask_agg.size(0)
@@ -181,6 +187,10 @@ class PATNetwork(nn.Module):
         pred_mask[pred_mask < 0.5] = 0
         pred_mask[pred_mask >= 0.5] = 1
 
+        prob_avg = prob_agg / nshot
+
+        if return_probs:
+            return pred_mask, prob_avg
         return pred_mask
 
     def compute_objective(self, logit_mask, gt_mask):

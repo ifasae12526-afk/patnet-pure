@@ -15,19 +15,29 @@ def test(model, dataloader, nshot):
     r""" Test PATNet """
     utils.fix_randseed(0)
     average_meter = AverageMeter(dataloader.dataset)
+    mae_list = []
+    ap_list = []
 
     for idx, batch in enumerate(dataloader):
         batch = utils.to_cuda(batch)
-        pred_mask = model.module.predict_mask_nshot(batch, nshot=nshot)
+        pred_mask, pred_prob = model.module.predict_mask_nshot(batch, nshot=nshot, return_probs=True)
         assert pred_mask.size() == batch['query_mask'].size()
 
         area_inter, area_union = Evaluator.classify_prediction(pred_mask.clone(), batch)
         average_meter.update(area_inter, area_union, batch['class_id'], loss=None)
         average_meter.write_process(idx, len(dataloader), epoch=-1, write_batch_idx=1)
 
+        # Compute MAE and AP
+        mae_list.append(Evaluator.compute_mae(pred_prob, batch['query_mask']))
+        ap_list.append(Evaluator.compute_ap(pred_prob, batch['query_mask']))
+
     average_meter.write_result('Test', 0)
     miou, fb_iou = average_meter.compute_iou()
-    return miou, fb_iou
+
+    mae = torch.stack(mae_list).mean()
+    mAP = torch.stack(ap_list).mean() * 100
+
+    return miou, fb_iou, mae, mAP
 
 
 if __name__ == '__main__':
@@ -70,7 +80,7 @@ if __name__ == '__main__':
     Logger.info('Test benchmark: %s (%d batches, %d-shot)' % (args.benchmark, len(dataloader_test), args.nshot))
 
     with torch.no_grad():
-        test_miou, test_fb_iou = test(model, dataloader_test, args.nshot)
+        test_miou, test_fb_iou, test_mae, test_mAP = test(model, dataloader_test, args.nshot)
 
-    Logger.info('mIoU: %5.2f \t FB-IoU: %5.2f' % (test_miou.item(), test_fb_iou.item()))
+    Logger.info('mIoU: %5.2f \t FB-IoU: %5.2f \t MAE: %5.4f \t mAP: %5.2f' % (test_miou.item(), test_fb_iou.item(), test_mae.item(), test_mAP.item()))
     Logger.info('==================== Finished Testing ====================')
