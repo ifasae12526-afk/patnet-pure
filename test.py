@@ -1,4 +1,4 @@
-r""" Few-Shot Semantic Segmentation testing code — PASCAL VOC 1-way 5-shot """
+r""" Few-Shot Semantic Segmentation testing code — PASCAL VOC 1-way 1/5-shot """
 import argparse
 
 import torch.nn as nn
@@ -31,7 +31,7 @@ def test(model, dataloader, nshot):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PATNet Testing — 1-way 5-shot PASCAL VOC')
+    parser = argparse.ArgumentParser(description='PATNet Testing — 1-way 1/5-shot PASCAL VOC')
     parser.add_argument('--datapath', type=str, default='./dataset',
                         help='Root dataset path (contains VOCdevkit/)')
     parser.add_argument('--benchmark', type=str, default='pascal',
@@ -42,7 +42,8 @@ if __name__ == '__main__':
     parser.add_argument('--load', type=str, default='',
                         help='Path to trained model checkpoint (best_model.pt)')
     parser.add_argument('--fold', type=int, default=0)
-    parser.add_argument('--nshot', type=int, default=5)
+    parser.add_argument('--nshot', type=int, default=5, choices=[1, 5],
+                        help='Number of support shots (1 or 5)')
     parser.add_argument('--backbone', type=str, default='resnet50', choices=['vgg16', 'resnet50'])
     parser.add_argument('--img_size', type=int, default=512,
                         help='Input image size')
